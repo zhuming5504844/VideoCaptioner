@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QFileDialog
-from qfluentwidgets import EditableComboBox, PushButton, SettingCard
+from qfluentwidgets import ComboBox, PushButton, SettingCard
 from qfluentwidgets.common.config import ConfigItem, qconfig
 
 
@@ -28,13 +28,20 @@ class ApiKeyComboSettingCard(SettingCard):
         self.keysConfigItem = keysConfigItem
         self._updating = False
 
-        self.comboBox = EditableComboBox(self)
+        self.comboBox = ComboBox(self)
         self.comboBox.setMinimumWidth(310)
 
         self.pasteButton = PushButton(self.tr("粘贴"), self)
         self.importButton = PushButton(self.tr("导入"), self)
         self.clearButton = PushButton(self.tr("清空"), self)
         self.deleteButton = PushButton(self.tr("删除当前"), self)
+        for button in (
+            self.pasteButton,
+            self.importButton,
+            self.clearButton,
+        ):
+            button.setFixedSize(52, 32)
+        self.deleteButton.setFixedSize(72, 32)
 
         self.hBoxLayout.addWidget(self.comboBox, 1, Qt.AlignRight)  # type: ignore
         for button in (
@@ -51,7 +58,7 @@ class ApiKeyComboSettingCard(SettingCard):
         self.comboBox.currentTextChanged.connect(self._on_text_changed)
         self.pasteButton.clicked.connect(self._paste_from_clipboard)
         self.importButton.clicked.connect(self._import_from_file)
-        self.clearButton.clicked.connect(self._clear_current_text)
+        self.clearButton.clicked.connect(self._clear_all_keys)
         self.deleteButton.clicked.connect(self._delete_current_key)
         keyConfigItem.valueChanged.connect(self.setValue)
 
@@ -63,14 +70,29 @@ class ApiKeyComboSettingCard(SettingCard):
             return []
         if not isinstance(data, list):
             return []
-        return [str(item).strip() for item in data if str(item).strip()]
+        return self._normalize_keys(data)
+
+    def _normalize_keys(self, values) -> list[str]:
+        keys: list[str] = []
+        for value in values:
+            for key in str(value).replace(",", "\n").split():
+                key = key.strip()
+                if key:
+                    keys.append(key)
+        return list(dict.fromkeys(keys))
 
     def _save_keys(self, keys: list[str]):
-        unique_keys = list(dict.fromkeys(key.strip() for key in keys if key.strip()))
-        qconfig.set(self.keysConfigItem, json.dumps(unique_keys, ensure_ascii=False))
+        normalized_keys = self._normalize_keys(keys)
+        qconfig.set(
+            self.keysConfigItem,
+            json.dumps(normalized_keys, ensure_ascii=False),
+        )
 
-    def _reload_keys(self):
-        current_key = (qconfig.get(self.keyConfigItem) or "").strip()
+    def _reload_keys(self, selected_key: str | None = None):
+        raw_key = (
+            qconfig.get(self.keyConfigItem) if selected_key is None else selected_key
+        )
+        current_key = (raw_key or "").strip()
         keys = self._stored_keys()
         if current_key and current_key not in keys:
             keys.insert(0, current_key)
@@ -79,42 +101,37 @@ class ApiKeyComboSettingCard(SettingCard):
         self._updating = True
         self.comboBox.clear()
         self.comboBox.addItems(keys)
-        self.comboBox.setText(current_key)
+        self.comboBox.setCurrentText(current_key)
         self._updating = False
 
-    def _remember_key(self, key: str):
-        key = key.strip()
-        if not key:
+    def _add_keys(self, keys: list[str]):
+        keys = self._normalize_keys(keys)
+        if not keys:
             return
-        keys = self._stored_keys()
-        if key not in keys:
-            keys.insert(0, key)
-            self._save_keys(keys)
-            self._reload_keys()
+        merged = keys + self._stored_keys()
+        self._save_keys(merged)
+        self._reload_keys(keys[0])
+        self._set_active_key(keys[0])
+
+    def _set_active_key(self, key: str):
+        qconfig.set(self.keyConfigItem, key)
+        self.keyChanged.emit(key)
 
     def _on_text_changed(self, text: str):
         if self._updating:
             return
-        key = text.strip()
-        qconfig.set(self.keyConfigItem, key)
-        if key:
-            self._remember_key(key)
-        self.keyChanged.emit(key)
+        self._set_active_key(text.strip())
 
     def setValue(self, value: str):
         value = (value or "").strip()
         if self.comboBox.currentText() == value:
             return
-        self._updating = True
-        self.comboBox.setText(value)
-        self._updating = False
-        if value:
-            self._remember_key(value)
+        self._reload_keys(value)
 
     def _paste_from_clipboard(self):
         clipboard = QApplication.clipboard()
         if clipboard:
-            self.comboBox.setText(clipboard.text().strip())
+            self._add_keys(clipboard.text().splitlines())
 
     def _import_from_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -126,17 +143,12 @@ class ApiKeyComboSettingCard(SettingCard):
         if not file_path:
             return
         text = Path(file_path).read_text(encoding="utf-8").strip()
-        # Allow one key per line and select the first imported key.
-        keys = [line.strip() for line in text.splitlines() if line.strip()]
-        if not keys:
-            return
-        merged = keys + self._stored_keys()
-        self._save_keys(merged)
-        self._reload_keys()
-        self.comboBox.setText(keys[0])
+        self._add_keys(text.splitlines())
 
-    def _clear_current_text(self):
-        self.comboBox.setText("")
+    def _clear_all_keys(self):
+        self._save_keys([])
+        self._reload_keys("")
+        self._set_active_key("")
 
     def _delete_current_key(self):
         current_key = self.comboBox.currentText().strip()
@@ -144,6 +156,6 @@ class ApiKeyComboSettingCard(SettingCard):
             return
         keys = [key for key in self._stored_keys() if key != current_key]
         self._save_keys(keys)
-        self._reload_keys()
         next_key = keys[0] if keys else ""
-        self.comboBox.setText(next_key)
+        self._reload_keys(next_key)
+        self._set_active_key(next_key)
