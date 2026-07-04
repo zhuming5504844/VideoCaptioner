@@ -17,7 +17,7 @@ from videocaptioner.core.asr.deepgram_asr import DEEPGRAM_MODELS
 from videocaptioner.core.entities import TranscribeLanguageEnum
 
 from ..common.config import cfg
-from .LineEditSettingCard import LineEditSettingCard
+from .ApiKeyComboSettingCard import ApiKeyComboSettingCard
 
 
 class DeepgramSettingWidget(QWidget):
@@ -41,12 +41,12 @@ class DeepgramSettingWidget(QWidget):
         self.setting_group = SettingCardGroup(self.tr("Deepgram 设置"), self)
 
         # API Key
-        self.api_key_card = LineEditSettingCard(
+        self.api_key_card = ApiKeyComboSettingCard(
             cfg.deepgram_api_key,
+            cfg.deepgram_api_keys,
             FIF.FINGERPRINT,
             self.tr("API Key"),
-            self.tr("输入 Deepgram API Key（也支持 DEEPGRAM_API_KEY 环境变量）"),
-            "",
+            self.tr("输入、粘贴或手动切换 Deepgram API Key（也支持 DEEPGRAM_API_KEY 环境变量）"),
             self.setting_group,
         )
 
@@ -99,7 +99,7 @@ class DeepgramSettingWidget(QWidget):
         )
 
         # 设置最小宽度
-        self.api_key_card.lineEdit.setMinimumWidth(200)
+        self.api_key_card.comboBox.setMinimumWidth(440)
         self.model_card.comboBox.setMinimumWidth(200)
         self.language_card.comboBox.setMinimumWidth(200)
 
