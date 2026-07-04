@@ -134,7 +134,7 @@ def _build_transcribe_parser(subparsers) -> None:
     asr.add_argument("--deepgram-api-key", metavar="KEY",
                      help="Deepgram API key (for --asr deepgram)")
     asr.add_argument("--deepgram-model", metavar="NAME",
-                     help="Deepgram model name (default: nova-2). Options: nova-2, nova-3, base-general, whisper")
+                     help="Deepgram model name (default: nova-2). Presets: nova-2, nova-3, base-general, whisper; custom model names are also supported")
 
     # Advanced options (configurable via 'config set', hidden from --help)
     for arg in ["--fw-model", "--fw-device", "--fw-vad-method", "--fw-prompt", "--whisper-prompt"]:

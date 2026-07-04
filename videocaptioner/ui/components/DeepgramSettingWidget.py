@@ -18,6 +18,7 @@ from videocaptioner.core.entities import TranscribeLanguageEnum
 
 from ..common.config import cfg
 from .ApiKeyComboSettingCard import ApiKeyComboSettingCard
+from .EditComboBoxSettingCard import EditComboBoxSettingCard
 
 
 class DeepgramSettingWidget(QWidget):
@@ -52,11 +53,11 @@ class DeepgramSettingWidget(QWidget):
 
         # Model
         model_labels = [f"{k} - {v}" for k, v in DEEPGRAM_MODELS.items()]
-        self.model_card = ComboBoxSettingCard(
+        self.model_card = EditComboBoxSettingCard(
             cfg.deepgram_model,
             FIF.ROBOT,
             self.tr("Deepgram 模型"),
-            self.tr("选择 Deepgram 转录模型"),
+            self.tr("选择 Deepgram 转录模型，或直接输入 Deepgram 最新/自定义模型名"),
             model_labels,
             self.setting_group,
         )
