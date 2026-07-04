@@ -230,6 +230,7 @@ class Config(QConfig):
 
     # ------------------- Deepgram 配置 -------------------
     deepgram_api_key = ConfigItem("Deepgram", "ApiKey", "")
+    deepgram_api_keys = ConfigItem("Deepgram", "ApiKeys", "[]")
     deepgram_model = OptionsConfigItem(
         "Deepgram", "Model", "nova-2",
         OptionsValidator(["nova-2", "nova-3", "base-general", "whisper"]),
