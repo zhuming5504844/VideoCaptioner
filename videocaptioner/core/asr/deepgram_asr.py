@@ -23,6 +23,19 @@ DEEPGRAM_MODELS = {
     "whisper": "Whisper (OpenAI)",
 }
 
+
+def normalize_deepgram_model(model: str | None) -> str:
+    """Return the Deepgram model id from a preset label or custom user input."""
+    value = (model or DEEPGRAM_DEFAULT_MODEL).strip()
+    if not value:
+        return DEEPGRAM_DEFAULT_MODEL
+
+    for model_id in DEEPGRAM_MODELS:
+        if value == model_id or value.startswith(f"{model_id} - "):
+            return model_id
+
+    return value
+
 # Languages that rely on Nova-2's built-in 30+ language support
 # Passed as BCP-47 tags in the language query param.
 # Deepgram supports auto-detection when language is omitted.
@@ -73,7 +86,7 @@ class DeepgramASR(BaseASR):
         numerals: bool = False,
     ):
         self.api_key = (api_key or os.getenv("DEEPGRAM_API_KEY", "")).strip()
-        self.model = model or DEEPGRAM_DEFAULT_MODEL
+        self.model = normalize_deepgram_model(model)
         self.language = language or ""
         self.punctuate = punctuate
         self.smart_format = smart_format
