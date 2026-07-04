@@ -29,7 +29,7 @@ class ApiKeyComboSettingCard(SettingCard):
         self._updating = False
 
         self.comboBox = ComboBox(self)
-        self.comboBox.setMinimumWidth(310)
+        self.comboBox.setMinimumWidth(380)
 
         self.pasteButton = PushButton(self.tr("粘贴"), self)
         self.importButton = PushButton(self.tr("导入"), self)
@@ -44,6 +44,7 @@ class ApiKeyComboSettingCard(SettingCard):
         self.deleteButton.setFixedSize(72, 32)
 
         self.hBoxLayout.addWidget(self.comboBox, 1, Qt.AlignRight)  # type: ignore
+        self.hBoxLayout.addSpacing(12)
         for button in (
             self.pasteButton,
             self.importButton,
