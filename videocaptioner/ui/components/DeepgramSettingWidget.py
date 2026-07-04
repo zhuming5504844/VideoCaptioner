@@ -46,7 +46,7 @@ class DeepgramSettingWidget(QWidget):
             cfg.deepgram_api_keys,
             FIF.FINGERPRINT,
             self.tr("API Key"),
-            self.tr("输入、粘贴、导入或手动切换 Deepgram API Key（也支持 DEEPGRAM_API_KEY 环境变量）"),
+            self.tr("输入、粘贴或手动切换 Deepgram API Key（也支持 DEEPGRAM_API_KEY 环境变量）"),
             self.setting_group,
         )
 
@@ -99,7 +99,7 @@ class DeepgramSettingWidget(QWidget):
         )
 
         # 设置最小宽度
-        self.api_key_card.comboBox.setMinimumWidth(380)
+        self.api_key_card.comboBox.setMinimumWidth(440)
         self.model_card.comboBox.setMinimumWidth(200)
         self.language_card.comboBox.setMinimumWidth(200)
 

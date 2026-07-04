@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtWidgets import QApplication
 from qfluentwidgets import ComboBox, PushButton, SettingCard
 from qfluentwidgets.common.config import ConfigItem, qconfig
 
 
 class ApiKeyComboSettingCard(SettingCard):
-    """API Key selector with paste/import/clear/delete actions."""
+    """API Key selector with paste and clear actions."""
 
     keyChanged = pyqtSignal(str)
 
@@ -29,28 +27,16 @@ class ApiKeyComboSettingCard(SettingCard):
         self._updating = False
 
         self.comboBox = ComboBox(self)
-        self.comboBox.setMinimumWidth(380)
+        self.comboBox.setMinimumWidth(440)
 
         self.pasteButton = PushButton(self.tr("粘贴"), self)
-        self.importButton = PushButton(self.tr("导入"), self)
         self.clearButton = PushButton(self.tr("清空"), self)
-        self.deleteButton = PushButton(self.tr("删除当前"), self)
-        for button in (
-            self.pasteButton,
-            self.importButton,
-            self.clearButton,
-        ):
-            button.setFixedSize(52, 32)
-        self.deleteButton.setFixedSize(72, 32)
+        for button in (self.pasteButton, self.clearButton):
+            button.setFixedSize(54, 32)
 
         self.hBoxLayout.addWidget(self.comboBox, 1, Qt.AlignRight)  # type: ignore
         self.hBoxLayout.addSpacing(12)
-        for button in (
-            self.pasteButton,
-            self.importButton,
-            self.clearButton,
-            self.deleteButton,
-        ):
+        for button in (self.pasteButton, self.clearButton):
             self.hBoxLayout.addSpacing(6)
             self.hBoxLayout.addWidget(button)
         self.hBoxLayout.addSpacing(16)
@@ -58,9 +44,7 @@ class ApiKeyComboSettingCard(SettingCard):
         self._reload_keys()
         self.comboBox.currentTextChanged.connect(self._on_text_changed)
         self.pasteButton.clicked.connect(self._paste_from_clipboard)
-        self.importButton.clicked.connect(self._import_from_file)
         self.clearButton.clicked.connect(self._clear_all_keys)
-        self.deleteButton.clicked.connect(self._delete_current_key)
         keyConfigItem.valueChanged.connect(self.setValue)
 
     def _stored_keys(self) -> list[str]:
@@ -134,29 +118,7 @@ class ApiKeyComboSettingCard(SettingCard):
         if clipboard:
             self._add_keys(clipboard.text().splitlines())
 
-    def _import_from_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            self.tr("导入 API Key"),
-            "",
-            self.tr("文本文件 (*.txt);;所有文件 (*)"),
-        )
-        if not file_path:
-            return
-        text = Path(file_path).read_text(encoding="utf-8").strip()
-        self._add_keys(text.splitlines())
-
     def _clear_all_keys(self):
         self._save_keys([])
         self._reload_keys("")
         self._set_active_key("")
-
-    def _delete_current_key(self):
-        current_key = self.comboBox.currentText().strip()
-        if not current_key:
-            return
-        keys = [key for key in self._stored_keys() if key != current_key]
-        self._save_keys(keys)
-        next_key = keys[0] if keys else ""
-        self._reload_keys(next_key)
-        self._set_active_key(next_key)
