@@ -2,6 +2,7 @@
 
 from videocaptioner.core.asr.deepinfra_asr import (
     DEEPINFRA_DEFAULT_MODEL,
+    DEEPINFRA_MAX_SEGMENT_DURATION_MS,
     DeepInfraASR,
     normalize_deepinfra_model,
 )
@@ -108,3 +109,37 @@ def test_make_segments_removes_cjk_leakage_for_english() -> None:
 
     assert len(segments) == 1
     assert segments[0].text == "I bought one of the artist's newest works."
+
+
+def test_make_segments_splits_long_deepinfra_segments_to_readable_duration() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False, language="en")
+    segments = asr._make_segments(
+        {
+            "segments": [
+                {
+                    "start": 0,
+                    "end": 29.5,
+                    "text": (
+                        "That just describes something that's really good. Amazing. "
+                        "And earlier we learned the word marvelous. "
+                        "Rocky Steps can you tell us? "
+                        "Well today we get to see Zach and Bella."
+                    ),
+                }
+            ]
+        }
+    )
+
+    assert len(segments) > 1
+    assert segments[0].start_time == 0
+    assert segments[-1].end_time == 29500
+    assert all(
+        segment.end_time - segment.start_time <= DEEPINFRA_MAX_SEGMENT_DURATION_MS
+        for segment in segments
+    )
+    assert " ".join(segment.text for segment in segments) == (
+        "That just describes something that's really good. Amazing. "
+        "And earlier we learned the word marvelous. "
+        "Rocky Steps can you tell us? "
+        "Well today we get to see Zach and Bella."
+    )

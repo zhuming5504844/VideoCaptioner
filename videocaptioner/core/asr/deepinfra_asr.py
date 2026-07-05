@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from typing import Any, Callable, Optional
@@ -9,6 +10,7 @@ from typing import Any, Callable, Optional
 import requests
 
 from ..utils.logger import setup_logger
+from ..utils.text_utils import is_mainly_cjk
 from .asr_data import ASRDataSeg
 from .base import BaseASR
 
@@ -16,6 +18,9 @@ logger = setup_logger("deepinfra_asr")
 
 DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/inference"
 DEEPINFRA_DEFAULT_MODEL = "openai/whisper-large-v3-turbo"
+DEEPINFRA_MAX_SEGMENT_DURATION_MS = 7000
+DEEPINFRA_MAX_SEGMENT_CHARS_CJK = 42
+DEEPINFRA_MAX_SEGMENT_CHARS_LATIN = 84
 
 DEEPINFRA_MODELS = {
     "mistralai/Voxtral-Mini-3B-2507": "Voxtral Mini 3B 2507",
@@ -66,6 +71,89 @@ DEEPINFRA_LANGUAGE_MAP: dict[str, str] = {
     "hi": "hi",
     "ar": "ar",
 }
+
+
+def _split_text_into_subtitle_chunks(text: str) -> list[str]:
+    """Split long DeepInfra text into subtitle-sized chunks."""
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return []
+
+    max_chars = (
+        DEEPINFRA_MAX_SEGMENT_CHARS_CJK
+        if is_mainly_cjk(text)
+        else DEEPINFRA_MAX_SEGMENT_CHARS_LATIN
+    )
+    if len(text) <= max_chars:
+        return [text]
+
+    parts = [
+        part.strip()
+        for part in re.split(r"(?<=[。！？!?；;：:，,\.])\s*", text)
+        if part.strip()
+    ]
+    if not parts:
+        parts = [text]
+
+    chunks: list[str] = []
+    current = ""
+    for part in parts:
+        separator = "" if not current or is_mainly_cjk(current + part) else " "
+        candidate = f"{current}{separator}{part}" if current else part
+        if current and len(candidate) > max_chars:
+            chunks.append(current)
+            current = part
+        else:
+            current = candidate
+
+        while len(current) > max_chars:
+            split_at = current.rfind(" ", 0, max_chars + 1)
+            if split_at <= 0:
+                split_at = max_chars
+            chunks.append(current[:split_at].strip())
+            current = current[split_at:].strip()
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+def _split_segment_to_subtitle_duration(seg: ASRDataSeg) -> list[ASRDataSeg]:
+    """Keep one DeepInfra segment within a generally readable subtitle duration."""
+    duration = max(seg.end_time - seg.start_time, 0)
+    chunks = _split_text_into_subtitle_chunks(seg.text)
+    if not chunks:
+        return []
+    if len(chunks) == 1 and duration <= DEEPINFRA_MAX_SEGMENT_DURATION_MS:
+        return [seg]
+
+    target_chunk_count = max(
+        len(chunks), math.ceil(duration / DEEPINFRA_MAX_SEGMENT_DURATION_MS)
+    )
+    if len(chunks) < target_chunk_count:
+        words = re.findall(r"\S+", seg.text)
+        units = words if len(words) >= target_chunk_count else list(seg.text)
+        separator = " " if units is words else ""
+        chunks = []
+        units_per_chunk = math.ceil(len(units) / target_chunk_count)
+        for index in range(0, len(units), units_per_chunk):
+            chunk = separator.join(units[index : index + units_per_chunk]).strip()
+            if chunk:
+                chunks.append(chunk)
+
+    current_time = seg.start_time
+    result: list[ASRDataSeg] = []
+    for index, chunk in enumerate(chunks):
+        if index == len(chunks) - 1:
+            end_time = seg.end_time
+        else:
+            chunk_duration = int(duration / max(len(chunks), 1))
+            end_time = min(seg.end_time, current_time + max(chunk_duration, 1))
+        result.append(ASRDataSeg(text=chunk, start_time=current_time, end_time=end_time))
+        current_time = end_time
+
+    return result
 
 
 def _language_lock_prompt(language: str) -> str:
@@ -222,7 +310,11 @@ class DeepInfraASR(BaseASR):
                     continue
                 start = int(float(segment.get("start", 0) or 0) * 1000)
                 end = int(float(segment.get("end", 0) or 0) * 1000)
-                segments.append(ASRDataSeg(text=text, start_time=start, end_time=end))
+                segments.extend(
+                    _split_segment_to_subtitle_duration(
+                        ASRDataSeg(text=text, start_time=start, end_time=end)
+                    )
+                )
 
         if not segments:
             text = _strip_unwanted_script_for_language(
