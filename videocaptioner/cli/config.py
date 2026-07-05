@@ -42,6 +42,8 @@ ENV_MAP: Dict[str, str] = {
     "VIDEOCAPTIONER_LLM_MODEL": "llm.model",
     "VIDEOCAPTIONER_WHISPER_API_KEY": "whisper_api.api_key",
     "VIDEOCAPTIONER_WHISPER_API_BASE": "whisper_api.api_base",
+    "DEEPGRAM_API_KEY": "deepgram.api_key",
+    "VIDEOCAPTIONER_DEEPGRAM_API_KEY": "deepgram.api_key",
     "VIDEOCAPTIONER_DEEPLX_ENDPOINT": "translate.deeplx_endpoint",
     "VIDEOCAPTIONER_TARGET_LANG": "translate.target_language",
     "VIDEOCAPTIONER_DUBBING_PROVIDER": "dubbing.provider",
