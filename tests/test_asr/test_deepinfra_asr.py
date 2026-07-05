@@ -65,3 +65,46 @@ def test_transcribe_config_includes_deepinfra_fields() -> None:
     assert "DeepInfra" in output
     assert "openai/whisper-large-v3" in output
     assert "translate" in output
+
+
+def test_submit_audio_adds_language_lock_prompt(monkeypatch) -> None:
+    captured = {}
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict:
+            return {"text": "Hello"}
+
+    def fake_post(url, headers, data, files, timeout):
+        captured["data"] = data
+        return DummyResponse()
+
+    monkeypatch.setattr("videocaptioner.core.asr.deepinfra_asr.requests.post", fake_post)
+
+    asr = DeepInfraASR(audio_input=b"\x00", api_key="test-key", language="en")
+    result = asr._submit_audio()
+
+    assert result == {"text": "Hello"}
+    assert captured["data"]["language"] == "en"
+    assert "English only" in captured["data"]["prompt"]
+    assert "Do not translate" in captured["data"]["prompt"]
+
+
+def test_make_segments_removes_cjk_leakage_for_english() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False, language="en")
+    segments = asr._make_segments(
+        {
+            "segments": [
+                {
+                    "start": 0,
+                    "end": 1,
+                    "text": "I bought one of the artist's newest works. 我买了那位艺术家最新的作品之一。",
+                }
+            ]
+        }
+    )
+
+    assert len(segments) == 1
+    assert segments[0].text == "I bought one of the artist's newest works."

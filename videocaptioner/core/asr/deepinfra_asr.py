@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Callable, Optional
 
 import requests
@@ -22,6 +23,27 @@ DEEPINFRA_MODELS = {
     "nvidia/Nemotron-3.5-ASR-Streaming-Multilingual-0.6b": "Nemotron 3.5 ASR Streaming Multilingual 0.6B",
     "openai/whisper-large-v3": "Whisper Large V3",
     "openai/whisper-large-v3-turbo": "Whisper Large V3 Turbo（推荐）",
+}
+
+DEEPINFRA_LANGUAGE_NAMES: dict[str, str] = {
+    "zh": "Chinese",
+    "en": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "it": "Italian",
+    "nl": "Dutch",
+    "vi": "Vietnamese",
+    "th": "Thai",
+    "id": "Indonesian",
+    "ms": "Malay",
+    "tl": "Tagalog",
+    "hi": "Hindi",
+    "ar": "Arabic",
 }
 
 DEEPINFRA_LANGUAGE_MAP: dict[str, str] = {
@@ -44,6 +66,34 @@ DEEPINFRA_LANGUAGE_MAP: dict[str, str] = {
     "hi": "hi",
     "ar": "ar",
 }
+
+
+def _language_lock_prompt(language: str) -> str:
+    """Return a Whisper prompt that keeps output in the requested language."""
+    language = (language or "").strip().lower()
+    if not language:
+        return ""
+
+    language_name = DEEPINFRA_LANGUAGE_NAMES.get(language, language)
+    return (
+        f"Transcribe the audio in {language_name} only. "
+        f"Do not translate to any other language. "
+        f"If speech is unclear, keep the transcript in {language_name}."
+    )
+
+
+def _strip_unwanted_script_for_language(text: str, language: str) -> str:
+    """Remove obvious cross-language leakage for strict language-specific output."""
+    if (language or "").strip().lower() != "en" or not text:
+        return text
+
+    # Whisper can occasionally leak CJK translations into English transcriptions.
+    # For an explicit English transcription request, remove those characters while
+    # preserving English words, numbers, punctuation and spacing.
+    text = re.sub(r"[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]+[，。！？；：、]*", " ", text)
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
 
 
 def normalize_deepinfra_model(model: str | None) -> str:
@@ -115,6 +165,9 @@ class DeepInfraASR(BaseASR):
         data: dict[str, str] = {"task": self.task}
         if self.language:
             data["language"] = DEEPINFRA_LANGUAGE_MAP.get(self.language, self.language)
+            prompt = _language_lock_prompt(data["language"])
+            if prompt:
+                data["prompt"] = prompt
         if self.temperature is not None:
             data["temperature"] = str(self.temperature)
 
@@ -162,7 +215,9 @@ class DeepInfraASR(BaseASR):
             for segment in raw_segments:
                 if not isinstance(segment, dict):
                     continue
-                text = (segment.get("text") or "").strip()
+                text = _strip_unwanted_script_for_language(
+                    (segment.get("text") or "").strip(), self.language
+                )
                 if not text:
                     continue
                 start = int(float(segment.get("start", 0) or 0) * 1000)
@@ -170,7 +225,9 @@ class DeepInfraASR(BaseASR):
                 segments.append(ASRDataSeg(text=text, start_time=start, end_time=end))
 
         if not segments:
-            text = (resp_data.get("text") or "").strip()
+            text = _strip_unwanted_script_for_language(
+                (resp_data.get("text") or "").strip(), self.language
+            )
             if text:
                 segments.append(ASRDataSeg(text=text, start_time=0, end_time=0))
 
