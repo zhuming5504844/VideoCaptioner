@@ -100,7 +100,7 @@ class DeepgramSettingWidget(QWidget):
         )
 
         # 设置最小宽度
-        self.api_key_card.comboBox.setMinimumWidth(440)
+        self.api_key_card.comboBox.setMinimumWidth(260)
         self.model_card.comboBox.setMinimumWidth(200)
         self.language_card.comboBox.setMinimumWidth(200)
 

@@ -397,6 +397,10 @@ def _build_doctor_config() -> dict:
             "api_base": str(cfg.fun_asr_api_base.value or "").strip(),
             "model": str(cfg.fun_asr_model.value or "fun-asr").strip(),
         },
+        "deepgram": {
+            "api_key": str(cfg.deepgram_api_key.value or "").strip(),
+            "model": str(cfg.deepgram_model.value or "nova-2").strip(),
+        },
         "transcribe": {
             "asr": asr_name,
         },
