@@ -321,7 +321,18 @@ class DeepInfraASR(BaseASR):
                 (resp_data.get("text") or "").strip(), self.language
             )
             if text:
-                segments.append(ASRDataSeg(text=text, start_time=0, end_time=0))
+                # Some DeepInfra models (notably Voxtral) may return only the
+                # top-level transcript for long chunks.  A zero-length fallback
+                # produces one subtitle per audio chunk (for example only three
+                # rows for a ~20 minute file).  Use the known chunk duration and
+                # the same readable-duration splitter so text-only responses still
+                # become timed subtitle lines.
+                end_time = max(int(float(self.audio_duration or 0) * 1000), 1)
+                segments.extend(
+                    _split_segment_to_subtitle_duration(
+                        ASRDataSeg(text=text, start_time=0, end_time=end_time)
+                    )
+                )
 
         if not segments:
             logger.warning("DeepInfra 未返回有效字幕段")

@@ -43,12 +43,43 @@ def test_make_segments_from_response() -> None:
 
 def test_make_segments_falls_back_to_text() -> None:
     asr = DeepInfraASR(audio_input=b"\x00", use_cache=False)
+    asr.audio_duration = 1
     segments = asr._make_segments({"text": "Only transcript."})
 
     assert len(segments) == 1
     assert segments[0].text == "Only transcript."
     assert segments[0].start_time == 0
-    assert segments[0].end_time == 0
+    assert segments[0].end_time == 1000
+
+
+def test_make_segments_splits_text_only_response_by_audio_duration() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False, language="en")
+    asr.audio_duration = 29.5
+
+    segments = asr._make_segments(
+        {
+            "text": (
+                "That just describes something that's really good. Amazing. "
+                "And earlier we learned the word marvelous. "
+                "Rocky Steps can you tell us? "
+                "Well today we get to see Zach and Bella."
+            )
+        }
+    )
+
+    assert len(segments) > 1
+    assert segments[0].start_time == 0
+    assert segments[-1].end_time == 29500
+    assert all(
+        segment.end_time - segment.start_time <= DEEPINFRA_MAX_SEGMENT_DURATION_MS
+        for segment in segments
+    )
+    assert " ".join(segment.text for segment in segments) == (
+        "That just describes something that's really good. Amazing. "
+        "And earlier we learned the word marvelous. "
+        "Rocky Steps can you tell us? "
+        "Well today we get to see Zach and Bella."
+    )
 
 
 def test_transcribe_config_includes_deepinfra_fields() -> None:
