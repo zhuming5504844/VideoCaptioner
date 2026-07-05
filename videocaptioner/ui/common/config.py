@@ -237,15 +237,32 @@ class Config(QConfig):
     deepgram_diarize = ConfigItem("Deepgram", "Diarize", False, BoolValidator())
     deepgram_paragraphs = ConfigItem("Deepgram", "Paragraphs", False, BoolValidator())
     deepgram_utterances = ConfigItem("Deepgram", "Utterances", False, BoolValidator())
-    deepgram_filler_words = ConfigItem("Deepgram", "FillerWords", False, BoolValidator())
+    deepgram_filler_words = ConfigItem(
+        "Deepgram", "FillerWords", False, BoolValidator()
+    )
     deepgram_numerals = ConfigItem("Deepgram", "Numerals", False, BoolValidator())
+
+    # ------------------- DeepInfra 配置 -------------------
+    deepinfra_api_key = ConfigItem("DeepInfra", "ApiKey", "")
+    deepinfra_api_keys = ConfigItem("DeepInfra", "ApiKeys", "[]")
+    deepinfra_model = ConfigItem("DeepInfra", "Model", "openai/whisper-large-v3-turbo")
+    deepinfra_task = OptionsConfigItem(
+        "DeepInfra", "Task", "transcribe", OptionsValidator(["transcribe", "translate"])
+    )
+    deepinfra_temperature = RangeConfigItem(
+        "DeepInfra", "Temperature", 0, RangeValidator(0, 1)
+    )
 
     # ------------------- Soniox 配置 -------------------
     soniox_api_key = ConfigItem("Soniox", "ApiKey", "")
     soniox_api_keys = ConfigItem("Soniox", "ApiKeys", "[]")
     soniox_model = ConfigItem("Soniox", "Model", "stt-async-v5")
-    soniox_language_identification = ConfigItem("Soniox", "LanguageIdentification", True, BoolValidator())
-    soniox_speaker_diarization = ConfigItem("Soniox", "SpeakerDiarization", False, BoolValidator())
+    soniox_language_identification = ConfigItem(
+        "Soniox", "LanguageIdentification", True, BoolValidator()
+    )
+    soniox_speaker_diarization = ConfigItem(
+        "Soniox", "SpeakerDiarization", False, BoolValidator()
+    )
 
     # ------------------- 配音配置 -------------------
     dubbing_provider = ConfigItem("Dubbing", "Provider", "edge")
@@ -255,21 +272,29 @@ class Config(QConfig):
     dubbing_model = ConfigItem("Dubbing", "Model", "edge-tts")
     dubbing_voice = ConfigItem("Dubbing", "Voice", "zh-CN-XiaoxiaoNeural")
     dubbing_style_prompt = ConfigItem("Dubbing", "StylePrompt", "")
-    dubbing_tts_workers = RangeConfigItem("Dubbing", "TTSWorkers", 5, RangeValidator(1, 20))
+    dubbing_tts_workers = RangeConfigItem(
+        "Dubbing", "TTSWorkers", 5, RangeValidator(1, 20)
+    )
     dubbing_use_cache = ConfigItem("Dubbing", "UseCache", True, BoolValidator())
     dubbing_clone_audio = ConfigItem("Dubbing", "CloneAudio", "")
     dubbing_clone_text = ConfigItem("Dubbing", "CloneText", "")
     dubbing_enabled = ConfigItem("Dubbing", "Enabled", False, BoolValidator())
     dubbing_timing = OptionsConfigItem(
-        "Dubbing", "Timing", "balanced",
+        "Dubbing",
+        "Timing",
+        "balanced",
         OptionsValidator(["balanced", "natural", "strict", "none"]),
     )
     dubbing_audio_mode = OptionsConfigItem(
-        "Dubbing", "AudioMode", "replace",
+        "Dubbing",
+        "AudioMode",
+        "replace",
         OptionsValidator(["replace", "mix", "duck"]),
     )
     dubbing_text_track = OptionsConfigItem(
-        "Dubbing", "TextTrack", "auto",
+        "Dubbing",
+        "TextTrack",
+        "auto",
         OptionsValidator(["auto", "first", "second"]),
     )
 

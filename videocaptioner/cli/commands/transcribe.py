@@ -44,6 +44,7 @@ def run(args: Namespace, config: dict) -> int:
 
     # Validate output format
     from videocaptioner.cli.validators import validate_output_format
+
     err = validate_output_format(Path(output_path))
     if err is not None:
         return err
@@ -83,11 +84,14 @@ def run(args: Namespace, config: dict) -> int:
         "jianying": TranscribeModelEnum.JIANYING,
         "whisper-cpp": TranscribeModelEnum.WHISPER_CPP,
         "deepgram": TranscribeModelEnum.DEEPGRAM,
+        "deepinfra": TranscribeModelEnum.DEEPINFRA,
     }
 
     # Map CLI string values to enums
     fw_model_str = get(config, "transcribe.faster_whisper.model", "large-v3")
-    fw_model_enum = next((m for m in FasterWhisperModelEnum if m.value == fw_model_str), None)
+    fw_model_enum = next(
+        (m for m in FasterWhisperModelEnum if m.value == fw_model_str), None
+    )
 
     vad_str = get(config, "transcribe.faster_whisper.vad_method", "silero-v4-fw")
     vad_map = {v.value.replace("_", "-"): v for v in VadMethodEnum}
@@ -95,7 +99,9 @@ def run(args: Namespace, config: dict) -> int:
 
     # WhisperCpp model enum
     wcpp_model_str = get(config, "transcribe.whisper_cpp.model", "large-v2")
-    wcpp_model_enum = next((m for m in WhisperModelEnum if m.value == wcpp_model_str), None)
+    wcpp_model_enum = next(
+        (m for m in WhisperModelEnum if m.value == wcpp_model_str), None
+    )
 
     transcribe_config = TranscribeConfig(
         transcribe_model=asr_map.get(asr_engine),
@@ -105,10 +111,16 @@ def run(args: Namespace, config: dict) -> int:
         faster_whisper_model=fw_model_enum,
         faster_whisper_model_dir=None,
         faster_whisper_device=get(config, "transcribe.faster_whisper.device", "auto"),
-        faster_whisper_vad_filter=get(config, "transcribe.faster_whisper.vad_filter", True),
+        faster_whisper_vad_filter=get(
+            config, "transcribe.faster_whisper.vad_filter", True
+        ),
         faster_whisper_vad_method=vad_enum,
-        faster_whisper_vad_threshold=get(config, "transcribe.faster_whisper.vad_threshold", 0.5),
-        faster_whisper_ff_mdx_kim2=get(config, "transcribe.faster_whisper.voice_extraction", False),
+        faster_whisper_vad_threshold=get(
+            config, "transcribe.faster_whisper.vad_threshold", 0.5
+        ),
+        faster_whisper_ff_mdx_kim2=get(
+            config, "transcribe.faster_whisper.voice_extraction", False
+        ),
         faster_whisper_one_word=True,
         faster_whisper_prompt=get(config, "transcribe.faster_whisper.prompt", ""),
         # WhisperCpp options
@@ -118,11 +130,20 @@ def run(args: Namespace, config: dict) -> int:
         whisper_api_base=get(config, "whisper_api.api_base", ""),
         whisper_api_model=get(config, "whisper_api.model", "whisper-1"),
         whisper_api_prompt=get(config, "whisper_api.prompt", ""),
+        # Deepgram options
+        deepgram_api_key=get(config, "deepgram.api_key", ""),
+        deepgram_model=get(config, "deepgram.model", "nova-2"),
+        # DeepInfra options
+        deepinfra_api_key=get(config, "deepinfra.api_key", ""),
+        deepinfra_model=get(config, "deepinfra.model", "openai/whisper-large-v3-turbo"),
+        deepinfra_task=get(config, "deepinfra.task", "transcribe"),
+        deepinfra_temperature=get(config, "deepinfra.temperature", 0),
     )
 
-
     # Progress callback
-    progress = None if quiet else output.ProgressLine(f"Transcribing [{asr_engine}]").start()
+    progress = (
+        None if quiet else output.ProgressLine(f"Transcribing [{asr_engine}]").start()
+    )
 
     def callback(pct: int, msg: str) -> None:
         if progress:
@@ -131,6 +152,7 @@ def run(args: Namespace, config: dict) -> int:
     try:
         # Auto-convert video to audio if needed
         from videocaptioner.cli.validators import AUDIO_EXTENSIONS
+
         audio_path = str(input_path)
         temp_audio = None
 
@@ -146,6 +168,7 @@ def run(args: Namespace, config: dict) -> int:
             import tempfile
 
             from videocaptioner.core.utils.video_utils import video2audio
+
             temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
             temp_audio.close()
             if not video2audio(str(input_path), output=temp_audio.name):
@@ -153,11 +176,14 @@ def run(args: Namespace, config: dict) -> int:
                 if os.path.getsize(temp_audio.name) == 0:
                     output.error("Input video has no audio track")
                 else:
-                    output.error("Failed to extract audio from video. Is FFmpeg installed?")
+                    output.error(
+                        "Failed to extract audio from video. Is FFmpeg installed?"
+                    )
                 return EXIT.RUNTIME_ERROR
             audio_path = temp_audio.name
 
         from videocaptioner.core.asr import transcribe
+
         asr_data = transcribe(audio_path, transcribe_config, callback=callback)
 
         # Save output
@@ -165,7 +191,9 @@ def run(args: Namespace, config: dict) -> int:
 
         if progress:
             n = len(asr_data.segments)
-            progress.finish(f"Transcription complete -> {output_path} ({n} segment{'' if n == 1 else 's'})")
+            progress.finish(
+                f"Transcription complete -> {output_path} ({n} segment{'' if n == 1 else 's'})"
+            )
         if quiet:
             print(output_path)
         return EXIT.SUCCESS
@@ -178,6 +206,7 @@ def run(args: Namespace, config: dict) -> int:
             output.error(msg)
         if verbose:
             import traceback
+
             traceback.print_exc()
         return EXIT.RUNTIME_ERROR
     finally:

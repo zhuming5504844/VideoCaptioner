@@ -1,0 +1,67 @@
+"""Tests for DeepInfra ASR integration helpers."""
+
+from videocaptioner.core.asr.deepinfra_asr import (
+    DEEPINFRA_DEFAULT_MODEL,
+    DeepInfraASR,
+    normalize_deepinfra_model,
+)
+from videocaptioner.core.entities import TranscribeConfig, TranscribeModelEnum
+
+
+def test_normalize_deepinfra_model_from_label() -> None:
+    assert (
+        normalize_deepinfra_model(
+            "openai/whisper-large-v3-turbo - Whisper Large V3 Turbo（推荐）"
+        )
+        == "openai/whisper-large-v3-turbo"
+    )
+
+
+def test_normalize_deepinfra_model_default() -> None:
+    assert normalize_deepinfra_model("") == DEEPINFRA_DEFAULT_MODEL
+
+
+def test_make_segments_from_response() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False)
+    segments = asr._make_segments(
+        {
+            "text": "Hello world.",
+            "segments": [
+                {"start": 0.25, "end": 1.5, "text": "Hello"},
+                {"start": 1.5, "end": 2.75, "text": "world."},
+            ],
+        }
+    )
+
+    assert len(segments) == 2
+    assert segments[0].text == "Hello"
+    assert segments[0].start_time == 250
+    assert segments[0].end_time == 1500
+    assert segments[1].text == "world."
+
+
+def test_make_segments_falls_back_to_text() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False)
+    segments = asr._make_segments({"text": "Only transcript."})
+
+    assert len(segments) == 1
+    assert segments[0].text == "Only transcript."
+    assert segments[0].start_time == 0
+    assert segments[0].end_time == 0
+
+
+def test_transcribe_config_includes_deepinfra_fields() -> None:
+    config = TranscribeConfig(
+        transcribe_model=TranscribeModelEnum.DEEPINFRA,
+        deepinfra_api_key="di-test-key",
+        deepinfra_model="openai/whisper-large-v3",
+        deepinfra_task="translate",
+        deepinfra_temperature=0.2,
+    )
+
+    output = config.print_config()
+
+    assert config.transcribe_model == TranscribeModelEnum.DEEPINFRA
+    assert "DeepInfra" in output
+    assert "openai/whisper-large-v3" in output
+    assert "translate" in output

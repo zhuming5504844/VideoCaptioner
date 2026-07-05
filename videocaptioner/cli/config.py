@@ -44,6 +44,8 @@ ENV_MAP: Dict[str, str] = {
     "VIDEOCAPTIONER_WHISPER_API_BASE": "whisper_api.api_base",
     "DEEPGRAM_API_KEY": "deepgram.api_key",
     "VIDEOCAPTIONER_DEEPGRAM_API_KEY": "deepgram.api_key",
+    "DEEPINFRA_API_KEY": "deepinfra.api_key",
+    "VIDEOCAPTIONER_DEEPINFRA_API_KEY": "deepinfra.api_key",
     "VIDEOCAPTIONER_DEEPLX_ENDPOINT": "translate.deeplx_endpoint",
     "VIDEOCAPTIONER_TARGET_LANG": "translate.target_language",
     "VIDEOCAPTIONER_DUBBING_PROVIDER": "dubbing.provider",
@@ -72,6 +74,12 @@ DEFAULTS: Dict[str, Any] = {
     "deepgram": {
         "api_key": "",
         "model": "nova-2",
+    },
+    "deepinfra": {
+        "api_key": "",
+        "model": "openai/whisper-large-v3-turbo",
+        "task": "transcribe",
+        "temperature": 0,
     },
     "whisper_api": {
         "api_key": "",
@@ -189,6 +197,7 @@ def load_config_file(path: Optional[Path] = None) -> dict:
             return tomllib.load(f)
     except Exception as e:
         import sys
+
         print(f"! Warning: Failed to parse config file {path}: {e}", file=sys.stderr)
         print("  Run 'videocaptioner config init' to recreate it.", file=sys.stderr)
         return {}
@@ -207,7 +216,10 @@ def load_env_overrides() -> dict:
             try:
                 parsed_value = _parse_value(value, dotted_key)
             except ValueError as exc:
-                print(f"! Warning: Invalid environment value {env_var}: {exc}", file=sys.stderr)
+                print(
+                    f"! Warning: Invalid environment value {env_var}: {exc}",
+                    file=sys.stderr,
+                )
                 continue
             _set_nested(overrides, dotted_key, parsed_value)
     return overrides
@@ -304,12 +316,13 @@ def _toml_value(value: Any) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, str):
-        escaped = (value
-            .replace("\\", "\\\\")
+        escaped = (
+            value.replace("\\", "\\\\")
             .replace('"', '\\"')
             .replace("\n", "\\n")
             .replace("\r", "\\r")
-            .replace("\t", "\\t"))
+            .replace("\t", "\\t")
+        )
         return f'"{escaped}"'
     return f'"{value!s}"'
 

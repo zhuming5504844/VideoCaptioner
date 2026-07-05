@@ -107,6 +107,11 @@ class TaskFactory:
             deepgram_utterances=cfg.deepgram_utterances.value,
             deepgram_filler_words=cfg.deepgram_filler_words.value,
             deepgram_numerals=cfg.deepgram_numerals.value,
+            # DeepInfra 配置
+            deepinfra_api_key=cfg.deepinfra_api_key.value,
+            deepinfra_model=cfg.deepinfra_model.value,
+            deepinfra_task=cfg.deepinfra_task.value,
+            deepinfra_temperature=cfg.deepinfra_temperature.value,
             # Soniox 配置
             soniox_api_key=cfg.soniox_api_key.value,
             soniox_model=cfg.soniox_model.value,
@@ -246,7 +251,11 @@ class TaskFactory:
             render_mode=cfg.subtitle_render_mode.value,
             video_quality=cfg.video_quality.value,
             subtitle_layout=cfg.subtitle_layout.value,
-            ass_style=TaskFactory.get_ass_style(cfg.subtitle_style_name.value) if use_style else "",
+            ass_style=(
+                TaskFactory.get_ass_style(cfg.subtitle_style_name.value)
+                if use_style
+                else ""
+            ),
             rounded_style=TaskFactory.get_rounded_style() if use_style else None,
         )
 

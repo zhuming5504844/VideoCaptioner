@@ -2,6 +2,7 @@ from videocaptioner.core.asr.asr_data import ASRData
 from videocaptioner.core.asr.bcut import BcutASR
 from videocaptioner.core.asr.chunked_asr import ChunkedASR
 from videocaptioner.core.asr.deepgram_asr import DeepgramASR
+from videocaptioner.core.asr.deepinfra_asr import DeepInfraASR
 from videocaptioner.core.asr.faster_whisper import FasterWhisperASR
 from videocaptioner.core.asr.fun_asr import BailianFunASR
 from videocaptioner.core.asr.jianying import JianYingASR
@@ -77,6 +78,9 @@ def _create_asr_instance(audio_path: str, config: TranscribeConfig) -> ChunkedAS
 
     elif model_type == TranscribeModelEnum.DEEPGRAM:
         return _create_deepgram_asr(audio_path, config)
+
+    elif model_type == TranscribeModelEnum.DEEPINFRA:
+        return _create_deepinfra_asr(audio_path, config)
 
     elif model_type == TranscribeModelEnum.SONIOX:
         return _create_soniox_asr(audio_path, config)
@@ -209,6 +213,25 @@ def _create_deepgram_asr(audio_path: str, config: TranscribeConfig) -> ChunkedAS
         asr_kwargs=asr_kwargs,
     )
 
+
+def _create_deepinfra_asr(audio_path: str, config: TranscribeConfig) -> ChunkedASR:
+    """Create DeepInfra ASR instance with chunking support."""
+    asr_kwargs = {
+        "use_cache": True,
+        "need_word_time_stamp": config.need_word_time_stamp,
+        "api_key": config.deepinfra_api_key or "",
+        "model": config.deepinfra_model or "openai/whisper-large-v3-turbo",
+        "language": config.transcribe_language,
+        "task": config.deepinfra_task or "transcribe",
+        "temperature": config.deepinfra_temperature,
+    }
+    return ChunkedASR(
+        asr_class=DeepInfraASR,
+        audio_path=audio_path,
+        asr_kwargs=asr_kwargs,
+    )
+
+
 def _create_soniox_asr(audio_path: str, config: TranscribeConfig) -> ChunkedASR:
     """Create Soniox ASR instance with chunking support."""
     asr_kwargs = {
@@ -246,4 +269,3 @@ if __name__ == "__main__":
 
     result = transcribe(audio_file, config, callback=progress_callback)
     print(result)
-

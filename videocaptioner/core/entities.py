@@ -123,6 +123,7 @@ class TranscribeModelEnum(Enum):
     WHISPER_CPP = "WhisperCpp"
     FUN_ASR = "阿里云百炼 FunASR"
     DEEPGRAM = "Deepgram"
+    DEEPINFRA = "DeepInfra"
     SONIOX = "Soniox"
 
 
@@ -486,7 +487,9 @@ class ASRLanguageCapability:
 
 def _get_all_languages_except_auto() -> list[TranscribeLanguageEnum]:
     """获取除 AUTO 外的All语言"""
-    return [lang for lang in TranscribeLanguageEnum if lang != TranscribeLanguageEnum.AUTO]
+    return [
+        lang for lang in TranscribeLanguageEnum if lang != TranscribeLanguageEnum.AUTO
+    ]
 
 
 ASR_LANGUAGE_CAPABILITIES: dict[TranscribeModelEnum, ASRLanguageCapability] = {
@@ -521,6 +524,10 @@ ASR_LANGUAGE_CAPABILITIES: dict[TranscribeModelEnum, ASRLanguageCapability] = {
         supports_auto=True,
     ),
     TranscribeModelEnum.DEEPGRAM: ASRLanguageCapability(
+        supported_languages=_get_all_languages_except_auto(),
+        supports_auto=True,
+    ),
+    TranscribeModelEnum.DEEPINFRA: ASRLanguageCapability(
         supported_languages=_get_all_languages_except_auto(),
         supports_auto=True,
     ),
@@ -606,6 +613,11 @@ class TranscribeConfig:
     deepgram_utterances: bool = False
     deepgram_filler_words: bool = False
     deepgram_numerals: bool = False
+    # DeepInfra 配置
+    deepinfra_api_key: Optional[str] = None
+    deepinfra_model: str = "openai/whisper-large-v3-turbo"
+    deepinfra_task: str = "transcribe"
+    deepinfra_temperature: float = 0
     # Soniox 配置
     soniox_api_key: Optional[str] = None
     soniox_model: str = "stt-async-v5"
@@ -666,11 +678,19 @@ class TranscribeConfig:
             lines.append(f"Model: {self.deepgram_model}")
             lines.append(f"Language: {self.transcribe_language or 'Auto'}")
 
+        elif self.transcribe_model == TranscribeModelEnum.DEEPINFRA:
+            lines.append(f"API Key: {self._mask_key(self.deepinfra_api_key)}")
+            lines.append(f"Model: {self.deepinfra_model}")
+            lines.append(f"Language: {self.transcribe_language or 'Auto'}")
+            lines.append(f"Task: {self.deepinfra_task}")
+
         elif self.transcribe_model == TranscribeModelEnum.SONIOX:
             lines.append(f"API Key: {self._mask_key(self.soniox_api_key)}")
             lines.append(f"Model: {self.soniox_model}")
             lines.append(f"Language: {self.transcribe_language or 'Auto'}")
-            lines.append(f"Language Identification: {self.soniox_language_identification}")
+            lines.append(
+                f"Language Identification: {self.soniox_language_identification}"
+            )
             lines.append(f"Speaker Diarization: {self.soniox_speaker_diarization}")
 
         lines.append("=" * 42)
