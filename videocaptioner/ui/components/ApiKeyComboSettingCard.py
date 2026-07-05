@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QSizePolicy
 from qfluentwidgets import ComboBox, PushButton, SettingCard
 from qfluentwidgets.common.config import ConfigItem, qconfig
 
@@ -27,7 +27,9 @@ class ApiKeyComboSettingCard(SettingCard):
         self._updating = False
 
         self.comboBox = ComboBox(self)
-        self.comboBox.setMinimumWidth(440)
+        self.comboBox.setMinimumWidth(260)
+        self.comboBox.setMaximumWidth(520)
+        self.comboBox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self.pasteButton = PushButton(self.tr("粘贴"), self)
         self.clearButton = PushButton(self.tr("清空"), self)
