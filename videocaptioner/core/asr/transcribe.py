@@ -5,6 +5,7 @@ from videocaptioner.core.asr.deepgram_asr import DeepgramASR
 from videocaptioner.core.asr.faster_whisper import FasterWhisperASR
 from videocaptioner.core.asr.fun_asr import BailianFunASR
 from videocaptioner.core.asr.jianying import JianYingASR
+from videocaptioner.core.asr.soniox_asr import SonioxASR
 from videocaptioner.core.asr.whisper_api import WhisperAPI
 from videocaptioner.core.asr.whisper_cpp import WhisperCppASR
 from videocaptioner.core.entities import TranscribeConfig, TranscribeModelEnum
@@ -76,6 +77,9 @@ def _create_asr_instance(audio_path: str, config: TranscribeConfig) -> ChunkedAS
 
     elif model_type == TranscribeModelEnum.DEEPGRAM:
         return _create_deepgram_asr(audio_path, config)
+
+    elif model_type == TranscribeModelEnum.SONIOX:
+        return _create_soniox_asr(audio_path, config)
 
     else:
         raise ValueError(f"Invalid transcription model: {model_type}")
@@ -205,6 +209,23 @@ def _create_deepgram_asr(audio_path: str, config: TranscribeConfig) -> ChunkedAS
         asr_kwargs=asr_kwargs,
     )
 
+def _create_soniox_asr(audio_path: str, config: TranscribeConfig) -> ChunkedASR:
+    """Create Soniox ASR instance with chunking support."""
+    asr_kwargs = {
+        "use_cache": True,
+        "need_word_time_stamp": config.need_word_time_stamp,
+        "api_key": config.soniox_api_key or "",
+        "model": config.soniox_model or "stt-async-v5",
+        "language": config.transcribe_language,
+        "enable_language_identification": config.soniox_language_identification,
+        "enable_speaker_diarization": config.soniox_speaker_diarization,
+    }
+    return ChunkedASR(
+        asr_class=SonioxASR,
+        audio_path=audio_path,
+        asr_kwargs=asr_kwargs,
+    )
+
 
 if __name__ == "__main__":
     # 示例用法
@@ -225,3 +246,4 @@ if __name__ == "__main__":
 
     result = transcribe(audio_file, config, callback=progress_callback)
     print(result)
+

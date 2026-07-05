@@ -123,6 +123,7 @@ class TranscribeModelEnum(Enum):
     WHISPER_CPP = "WhisperCpp"
     FUN_ASR = "阿里云百炼 FunASR"
     DEEPGRAM = "Deepgram"
+    SONIOX = "Soniox"
 
 
 class TranslatorServiceEnum(Enum):
@@ -605,6 +606,11 @@ class TranscribeConfig:
     deepgram_utterances: bool = False
     deepgram_filler_words: bool = False
     deepgram_numerals: bool = False
+    # Soniox 配置
+    soniox_api_key: Optional[str] = None
+    soniox_model: str = "stt-async-v5"
+    soniox_language_identification: bool = True
+    soniox_speaker_diarization: bool = False
 
     def _mask_key(self, key: Optional[str]) -> str:
         """Mask sensitive key for display"""
@@ -654,6 +660,18 @@ class TranscribeConfig:
             lines.append(f"API Key: {self._mask_key(self.fun_asr_api_key)}")
             lines.append(f"Model: {self.fun_asr_model}")
             lines.append(f"Language: {self.transcribe_language or 'Auto'}")
+
+        elif self.transcribe_model == TranscribeModelEnum.DEEPGRAM:
+            lines.append(f"API Key: {self._mask_key(self.deepgram_api_key)}")
+            lines.append(f"Model: {self.deepgram_model}")
+            lines.append(f"Language: {self.transcribe_language or 'Auto'}")
+
+        elif self.transcribe_model == TranscribeModelEnum.SONIOX:
+            lines.append(f"API Key: {self._mask_key(self.soniox_api_key)}")
+            lines.append(f"Model: {self.soniox_model}")
+            lines.append(f"Language: {self.transcribe_language or 'Auto'}")
+            lines.append(f"Language Identification: {self.soniox_language_identification}")
+            lines.append(f"Speaker Diarization: {self.soniox_speaker_diarization}")
 
         lines.append("=" * 42)
         return "\n".join(lines)
