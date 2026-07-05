@@ -107,6 +107,11 @@ class TaskFactory:
             deepgram_utterances=cfg.deepgram_utterances.value,
             deepgram_filler_words=cfg.deepgram_filler_words.value,
             deepgram_numerals=cfg.deepgram_numerals.value,
+            # Soniox 配置
+            soniox_api_key=cfg.soniox_api_key.value,
+            soniox_model=cfg.soniox_model.value,
+            soniox_language_identification=cfg.soniox_language_identification.value,
+            soniox_speaker_diarization=cfg.soniox_speaker_diarization.value,
         )
 
         task = TranscribeTask(

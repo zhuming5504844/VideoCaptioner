@@ -240,6 +240,13 @@ class Config(QConfig):
     deepgram_filler_words = ConfigItem("Deepgram", "FillerWords", False, BoolValidator())
     deepgram_numerals = ConfigItem("Deepgram", "Numerals", False, BoolValidator())
 
+    # ------------------- Soniox 配置 -------------------
+    soniox_api_key = ConfigItem("Soniox", "ApiKey", "")
+    soniox_api_keys = ConfigItem("Soniox", "ApiKeys", "[]")
+    soniox_model = ConfigItem("Soniox", "Model", "stt-async-v5")
+    soniox_language_identification = ConfigItem("Soniox", "LanguageIdentification", True, BoolValidator())
+    soniox_speaker_diarization = ConfigItem("Soniox", "SpeakerDiarization", False, BoolValidator())
+
     # ------------------- 配音配置 -------------------
     dubbing_provider = ConfigItem("Dubbing", "Provider", "edge")
     dubbing_preset = ConfigItem("Dubbing", "Preset", "edge-cn-xiaoxiao")

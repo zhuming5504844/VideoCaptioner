@@ -3,6 +3,7 @@ from .check import TranscribeCheckResult, check_transcribe
 from .chunked_asr import ChunkedASR
 from .deepgram_asr import DeepgramASR
 from .faster_whisper import FasterWhisperASR
+from .soniox_asr import SonioxASR
 from .fun_asr import BailianFunASR
 from .jianying import JianYingASR
 from .status import ASRStatus
@@ -15,6 +16,7 @@ __all__ = [
     "ChunkedASR",
     "DeepgramASR",
     "FasterWhisperASR",
+    "SonioxASR",
     "BailianFunASR",
     "JianYingASR",
     "WhisperAPI",

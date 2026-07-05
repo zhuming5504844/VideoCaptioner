@@ -14,6 +14,7 @@ from videocaptioner.core.utils.platform_utils import is_macos
 from .DeepgramSettingWidget import DeepgramSettingWidget
 from .FasterWhisperSettingWidget import FasterWhisperSettingWidget
 from .FunASRSettingWidget import FunASRSettingWidget
+from .SonioxSettingWidget import SonioxSettingWidget
 from .WhisperAPISettingWidget import WhisperAPISettingWidget
 from .WhisperCppSettingWidget import WhisperCppSettingWidget
 
@@ -36,6 +37,7 @@ class TranscriptionSettingCard(QWidget):
         self.whisper_api_widget = WhisperAPISettingWidget(self)
         self.fun_asr_widget = FunASRSettingWidget(self)
         self.deepgram_widget = DeepgramSettingWidget(self)
+        self.soniox_widget = SonioxSettingWidget(self)
 
         # FasterWhisper 在 macOS 上不可用
         self.faster_whisper_widget: Optional[FasterWhisperSettingWidget] = None
@@ -47,6 +49,7 @@ class TranscriptionSettingCard(QWidget):
         self.stacked_widget.addWidget(self.whisper_api_widget)
         self.stacked_widget.addWidget(self.fun_asr_widget)
         self.stacked_widget.addWidget(self.deepgram_widget)
+        self.stacked_widget.addWidget(self.soniox_widget)
         if self.faster_whisper_widget is not None:
             self.stacked_widget.addWidget(self.faster_whisper_widget)
 
@@ -64,5 +67,7 @@ class TranscriptionSettingCard(QWidget):
             self.stacked_widget.setCurrentWidget(self.fun_asr_widget)
         elif value == TranscribeModelEnum.DEEPGRAM.value:
             self.stacked_widget.setCurrentWidget(self.deepgram_widget)
+        elif value == TranscribeModelEnum.SONIOX.value:
+            self.stacked_widget.setCurrentWidget(self.soniox_widget)
         else:
             self.stacked_widget.setCurrentWidget(self.empty_widget)
