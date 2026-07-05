@@ -220,7 +220,7 @@ def _create_deepinfra_asr(audio_path: str, config: TranscribeConfig) -> ChunkedA
         "use_cache": True,
         "need_word_time_stamp": config.need_word_time_stamp,
         "api_key": config.deepinfra_api_key or "",
-        "model": config.deepinfra_model or "openai/whisper-large-v3-turbo",
+        "model": config.deepinfra_model or "openai/whisper-timestamped-large-v3",
         "language": config.transcribe_language,
         "task": config.deepinfra_task or "transcribe",
         "temperature": config.deepinfra_temperature,
@@ -229,6 +229,8 @@ def _create_deepinfra_asr(audio_path: str, config: TranscribeConfig) -> ChunkedA
         asr_class=DeepInfraASR,
         audio_path=audio_path,
         asr_kwargs=asr_kwargs,
+        chunk_length=60 * 5,
+        chunk_overlap=5,
     )
 
 

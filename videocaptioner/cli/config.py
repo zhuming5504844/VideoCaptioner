@@ -77,7 +77,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "deepinfra": {
         "api_key": "",
-        "model": "openai/whisper-large-v3-turbo",
+        "model": "openai/whisper-timestamped-large-v3",
         "task": "transcribe",
         "temperature": 0,
     },

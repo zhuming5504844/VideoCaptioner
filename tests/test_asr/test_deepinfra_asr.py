@@ -12,9 +12,9 @@ from videocaptioner.core.entities import TranscribeConfig, TranscribeModelEnum
 def test_normalize_deepinfra_model_from_label() -> None:
     assert (
         normalize_deepinfra_model(
-            "openai/whisper-large-v3-turbo - Whisper Large V3 Turbo（推荐）"
+            "openai/whisper-timestamped-large-v3 - Whisper Timestamped Large V3（时间轴优先）"
         )
-        == "openai/whisper-large-v3-turbo"
+        == "openai/whisper-timestamped-large-v3"
     )
 
 
@@ -119,9 +119,40 @@ def test_submit_audio_adds_language_lock_prompt(monkeypatch) -> None:
     result = asr._submit_audio()
 
     assert result == {"text": "Hello"}
-    assert captured["data"]["language"] == "en"
-    assert "English only" in captured["data"]["prompt"]
-    assert "Do not translate" in captured["data"]["prompt"]
+    data = dict(captured["data"])
+    granularities = [
+        value for key, value in captured["data"] if key == "timestamp_granularities[]"
+    ]
+    assert data["response_format"] == "verbose_json"
+    assert granularities == ["word", "segment"]
+    assert data["language"] == "en"
+    assert "English only" in data["prompt"]
+    assert "Do not translate" in data["prompt"]
+
+
+def test_make_segments_prefers_words_over_segment_timestamps() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False, language="en")
+    segments = asr._make_segments(
+        {
+            "segments": [
+                {
+                    "start": 99,
+                    "end": 120,
+                    "text": "Bad segment timing.",
+                    "words": [
+                        {"start": 0.25, "end": 0.7, "word": "Good"},
+                        {"start": 0.7, "end": 1.2, "word": "word"},
+                        {"start": 1.2, "end": 1.5, "word": "timing."},
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert len(segments) == 1
+    assert segments[0].text == "Good word timing."
+    assert segments[0].start_time == 250
+    assert segments[0].end_time == 1500
 
 
 def test_make_segments_removes_cjk_leakage_for_english() -> None:

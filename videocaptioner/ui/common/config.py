@@ -245,7 +245,9 @@ class Config(QConfig):
     # ------------------- DeepInfra 配置 -------------------
     deepinfra_api_key = ConfigItem("DeepInfra", "ApiKey", "")
     deepinfra_api_keys = ConfigItem("DeepInfra", "ApiKeys", "[]")
-    deepinfra_model = ConfigItem("DeepInfra", "Model", "openai/whisper-large-v3-turbo")
+    deepinfra_model = ConfigItem(
+        "DeepInfra", "Model", "openai/whisper-timestamped-large-v3"
+    )
     deepinfra_task = OptionsConfigItem(
         "DeepInfra", "Task", "transcribe", OptionsValidator(["transcribe", "translate"])
     )

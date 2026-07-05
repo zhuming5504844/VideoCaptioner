@@ -615,7 +615,7 @@ class TranscribeConfig:
     deepgram_numerals: bool = False
     # DeepInfra 配置
     deepinfra_api_key: Optional[str] = None
-    deepinfra_model: str = "openai/whisper-large-v3-turbo"
+    deepinfra_model: str = "openai/whisper-timestamped-large-v3"
     deepinfra_task: str = "transcribe"
     deepinfra_temperature: float = 0
     # Soniox 配置

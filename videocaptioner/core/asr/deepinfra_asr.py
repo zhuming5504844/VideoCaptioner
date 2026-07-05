@@ -17,12 +17,15 @@ from .base import BaseASR
 logger = setup_logger("deepinfra_asr")
 
 DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/inference"
-DEEPINFRA_DEFAULT_MODEL = "openai/whisper-large-v3-turbo"
+DEEPINFRA_PREFERRED_TIMESTAMPED_MODEL = "openai/whisper-timestamped-large-v3"
+DEEPINFRA_DEFAULT_MODEL = DEEPINFRA_PREFERRED_TIMESTAMPED_MODEL
 DEEPINFRA_MAX_SEGMENT_DURATION_MS = 7000
 DEEPINFRA_MAX_SEGMENT_CHARS_CJK = 42
 DEEPINFRA_MAX_SEGMENT_CHARS_LATIN = 84
 
 DEEPINFRA_MODELS = {
+    "openai/whisper-timestamped-large-v3": "Whisper Timestamped Large V3（时间轴优先）",
+    "openai/whisper-timestamped-large-v3-turbo": "Whisper Timestamped Large V3 Turbo（时间轴优先）",
     "mistralai/Voxtral-Mini-3B-2507": "Voxtral Mini 3B 2507",
     "mistralai/Voxtral-Small-24B-2507": "Voxtral Small 24B 2507",
     "nvidia/Nemotron-3.5-ASR-Streaming-Multilingual-0.6b": "Nemotron 3.5 ASR Streaming Multilingual 0.6B",
@@ -156,6 +159,129 @@ def _split_segment_to_subtitle_duration(seg: ASRDataSeg) -> list[ASRDataSeg]:
     return result
 
 
+def _word_text(word: dict) -> str:
+    """Return normalized text from a DeepInfra word timestamp object."""
+    return str(word.get("word") or word.get("text") or "").strip()
+
+
+def _word_time_ms(word: dict, key: str) -> Optional[int]:
+    """Return a word timestamp in milliseconds, accepting seconds or ms values."""
+    value = word.get(key)
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number < 0:
+        return None
+    return int(number if number > 1000 else number * 1000)
+
+
+def _collect_words(resp_data: dict, language: str) -> list[dict]:
+    """Collect valid word timestamps from top-level and segment-level payloads."""
+    raw_words: list[Any] = []
+    if isinstance(resp_data.get("words"), list):
+        raw_words.extend(resp_data["words"])
+    else:
+        raw_segments = resp_data.get("segments") or []
+        if isinstance(raw_segments, list):
+            for segment in raw_segments:
+                if isinstance(segment, dict) and isinstance(segment.get("words"), list):
+                    raw_words.extend(segment["words"])
+
+    words: list[dict] = []
+    last_end = -1
+    for raw_word in raw_words:
+        if not isinstance(raw_word, dict):
+            continue
+        text = _strip_unwanted_script_for_language(_word_text(raw_word), language)
+        start = _word_time_ms(raw_word, "start")
+        end = _word_time_ms(raw_word, "end")
+        if not text or start is None or end is None:
+            continue
+        if end <= start:
+            end = start + 1
+        # Drop obvious adjacent duplicates from malformed provider responses.
+        if (
+            words
+            and text == words[-1]["text"]
+            and start == words[-1]["start"]
+            and end == words[-1]["end"]
+        ):
+            continue
+        if start < last_end:
+            start = last_end
+            end = max(end, start + 1)
+        words.append({"text": text, "start": start, "end": end})
+        last_end = end
+    return words
+
+
+def _join_word_text(parts: list[str]) -> str:
+    """Join word timestamp tokens into readable subtitle text."""
+    if not parts:
+        return ""
+    text = ""
+    for part in parts:
+        if not text:
+            text = part
+        elif re.match(r"^[,.;:!?，。！？；：、%)\]}]+$", part):
+            text += part
+        elif re.match(r"^[('\"“‘\[{（]+$", part):
+            text += " " + part
+        else:
+            text += " " + part
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _words_to_subtitle_segments(words: list[dict]) -> list[ASRDataSeg]:
+    """Aggregate word timestamps into stable subtitle blocks."""
+    segments: list[ASRDataSeg] = []
+    current: list[dict] = []
+
+    def flush() -> None:
+        nonlocal current
+        if not current:
+            return
+        text = _join_word_text([word["text"] for word in current])
+        if text:
+            segments.append(
+                ASRDataSeg(
+                    text=text,
+                    start_time=current[0]["start"],
+                    end_time=current[-1]["end"],
+                )
+            )
+        current = []
+
+    for word in words:
+        candidate_words = current + [word]
+        candidate_text = _join_word_text([item["text"] for item in candidate_words])
+        duration = word["end"] - candidate_words[0]["start"]
+        gap = word["start"] - current[-1]["end"] if current else 0
+        should_split = bool(
+            current
+            and (
+                gap >= 700
+                or duration > DEEPINFRA_MAX_SEGMENT_DURATION_MS
+                or len(candidate_text)
+                > (
+                    DEEPINFRA_MAX_SEGMENT_CHARS_CJK
+                    if is_mainly_cjk(candidate_text)
+                    else DEEPINFRA_MAX_SEGMENT_CHARS_LATIN
+                )
+                or re.search(r"[。！？!?]\s*$", current[-1]["text"])
+            )
+        )
+        if should_split:
+            flush()
+        current.append(word)
+
+    flush()
+    return segments
+
+
 def _language_lock_prompt(language: str) -> str:
     """Return a Whisper prompt that keeps output in the requested language."""
     language = (language or "").strip().lower()
@@ -250,14 +376,20 @@ class DeepInfraASR(BaseASR):
     def _submit_audio(self) -> dict:
         """Send audio bytes to DeepInfra and return parsed JSON response."""
         url = f"{DEEPINFRA_BASE_URL}/{self.model}"
-        data: dict[str, str] = {"task": self.task}
+        data: list[tuple[str, str]] = [
+            ("task", self.task),
+            ("response_format", "verbose_json"),
+            ("timestamp_granularities[]", "word"),
+            ("timestamp_granularities[]", "segment"),
+        ]
         if self.language:
-            data["language"] = DEEPINFRA_LANGUAGE_MAP.get(self.language, self.language)
-            prompt = _language_lock_prompt(data["language"])
+            language = DEEPINFRA_LANGUAGE_MAP.get(self.language, self.language)
+            data.append(("language", language))
+            prompt = _language_lock_prompt(language)
             if prompt:
-                data["prompt"] = prompt
+                data.append(("prompt", prompt))
         if self.temperature is not None:
-            data["temperature"] = str(self.temperature)
+            data.append(("temperature", str(self.temperature)))
 
         headers = {"Authorization": f"Bearer {self.api_key}"}
         files = {"audio": ("audio.wav", self.file_binary or b"", "audio/wav")}
@@ -297,6 +429,12 @@ class DeepInfraASR(BaseASR):
         if not isinstance(resp_data, dict):
             logger.error("DeepInfra 响应格式异常: %s", str(resp_data)[:300])
             return segments
+
+        words = _collect_words(resp_data, self.language)
+        if words:
+            segments = _words_to_subtitle_segments(words)
+            if segments:
+                return segments
 
         raw_segments = resp_data.get("segments") or []
         if isinstance(raw_segments, list):
