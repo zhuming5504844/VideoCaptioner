@@ -88,9 +88,7 @@ def _split_text_into_subtitle_chunks(text: str) -> list[str]:
         return [text]
 
     parts = [
-        part.strip()
-        for part in re.split(r"(?<=[。！？!?；;：:，,\.])\s*", text)
-        if part.strip()
+        part.strip() for part in re.split(r"(?<=[。！？!?；;：:，,\.])\s*", text) if part.strip()
     ]
     if not parts:
         parts = [text]
@@ -128,9 +126,7 @@ def _split_segment_to_subtitle_duration(seg: ASRDataSeg) -> list[ASRDataSeg]:
     if len(chunks) == 1 and duration <= DEEPINFRA_MAX_SEGMENT_DURATION_MS:
         return [seg]
 
-    target_chunk_count = max(
-        len(chunks), math.ceil(duration / DEEPINFRA_MAX_SEGMENT_DURATION_MS)
-    )
+    target_chunk_count = max(len(chunks), math.ceil(duration / DEEPINFRA_MAX_SEGMENT_DURATION_MS))
     if len(chunks) < target_chunk_count:
         words = re.findall(r"\S+", seg.text)
         units = words if len(words) >= target_chunk_count else list(seg.text)
@@ -184,6 +180,83 @@ def _strip_unwanted_script_for_language(text: str, language: str) -> str:
     return text.strip()
 
 
+def _make_word_segment(word: dict, language: str) -> ASRDataSeg | None:
+    """Convert a DeepInfra word timestamp entry into an ASR segment."""
+    text = _strip_unwanted_script_for_language(
+        str(word.get("word") or word.get("text") or "").strip(), language
+    )
+    if not text:
+        return None
+
+    try:
+        start = int(float(word.get("start", 0) or 0) * 1000)
+        end = int(float(word.get("end", 0) or 0) * 1000)
+    except (TypeError, ValueError):
+        return None
+
+    return ASRDataSeg(text=text, start_time=start, end_time=max(end, start))
+
+
+def _word_segments_from_payload(payload: dict, language: str) -> list[ASRDataSeg]:
+    """Extract exact word-level timestamps from either root or nested segments."""
+    words: list[dict] = []
+    root_words = payload.get("words")
+    if isinstance(root_words, list):
+        words.extend(word for word in root_words if isinstance(word, dict))
+        result = [_make_word_segment(word, language) for word in words]
+        return [word for word in result if word is not None]
+
+    raw_segments = payload.get("segments") or []
+    if isinstance(raw_segments, list):
+        for segment in raw_segments:
+            if not isinstance(segment, dict):
+                continue
+            segment_words = segment.get("words")
+            if isinstance(segment_words, list):
+                words.extend(word for word in segment_words if isinstance(word, dict))
+
+    result = [_make_word_segment(word, language) for word in words]
+    return [word for word in result if word is not None]
+
+
+def _split_segment_by_word_timestamps(
+    seg: ASRDataSeg, word_segments: list[ASRDataSeg]
+) -> list[ASRDataSeg]:
+    """Split a sentence into readable chunks using real word timestamp boundaries."""
+    if not word_segments:
+        return _split_segment_to_subtitle_duration(seg)
+
+    chunks = _split_text_into_subtitle_chunks(seg.text)
+    if not chunks:
+        return []
+    if len(chunks) == 1 and seg.end_time - seg.start_time <= DEEPINFRA_MAX_SEGMENT_DURATION_MS:
+        return [seg]
+
+    result: list[ASRDataSeg] = []
+    word_index = 0
+    for chunk_index, chunk in enumerate(chunks):
+        chunk_words = re.findall(r"\S+", chunk)
+        if not chunk_words:
+            continue
+        take_count = len(chunk_words)
+        if chunk_index == len(chunks) - 1:
+            selected = word_segments[word_index:]
+        else:
+            selected = word_segments[word_index : word_index + take_count]
+        word_index += take_count
+
+        if selected:
+            result.append(
+                ASRDataSeg(
+                    text=chunk,
+                    start_time=selected[0].start_time,
+                    end_time=selected[-1].end_time,
+                )
+            )
+
+    return result or _split_segment_to_subtitle_duration(seg)
+
+
 def normalize_deepinfra_model(model: str | None) -> str:
     """Return the DeepInfra model id from a preset label or custom user input."""
     value = (model or DEEPINFRA_DEFAULT_MODEL).strip()
@@ -229,9 +302,7 @@ class DeepInfraASR(BaseASR):
             f"{self.task}:{self.temperature}:{self.need_word_time_stamp}"
         )
 
-    def _run(
-        self, callback: Optional[Callable[[int, str], None]] = None, **kwargs: Any
-    ) -> dict:
+    def _run(self, callback: Optional[Callable[[int, str], None]] = None, **kwargs: Any) -> dict:
         if not self.api_key:
             raise ValueError(
                 "DeepInfra API Key 未配置，请先在设置页或环境变量 DEEPINFRA_API_KEY 中填写。"
@@ -251,6 +322,8 @@ class DeepInfraASR(BaseASR):
         """Send audio bytes to DeepInfra and return parsed JSON response."""
         url = f"{DEEPINFRA_BASE_URL}/{self.model}"
         data: dict[str, str] = {"task": self.task}
+        if self.need_word_time_stamp:
+            data["timestamp_granularities"] = "word"
         if self.language:
             data["language"] = DEEPINFRA_LANGUAGE_MAP.get(self.language, self.language)
             prompt = _language_lock_prompt(data["language"])
@@ -298,6 +371,10 @@ class DeepInfraASR(BaseASR):
             logger.error("DeepInfra 响应格式异常: %s", str(resp_data)[:300])
             return segments
 
+        word_segments = _word_segments_from_payload(resp_data, self.language)
+        if self.need_word_time_stamp and word_segments:
+            return word_segments
+
         raw_segments = resp_data.get("segments") or []
         if isinstance(raw_segments, list):
             for segment in raw_segments:
@@ -310,11 +387,15 @@ class DeepInfraASR(BaseASR):
                     continue
                 start = int(float(segment.get("start", 0) or 0) * 1000)
                 end = int(float(segment.get("end", 0) or 0) * 1000)
-                segments.extend(
-                    _split_segment_to_subtitle_duration(
-                        ASRDataSeg(text=text, start_time=start, end_time=end)
-                    )
-                )
+                seg = ASRDataSeg(text=text, start_time=start, end_time=end)
+                segment_word_segments = _word_segments_from_payload(segment, self.language)
+                if not segment_word_segments:
+                    segment_word_segments = [
+                        word
+                        for word in word_segments
+                        if start <= word.start_time and word.end_time <= end
+                    ]
+                segments.extend(_split_segment_by_word_timestamps(seg, segment_word_segments))
 
         if not segments:
             text = _strip_unwanted_script_for_language(

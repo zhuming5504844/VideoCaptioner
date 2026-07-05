@@ -11,9 +11,7 @@ from videocaptioner.core.entities import TranscribeConfig, TranscribeModelEnum
 
 def test_normalize_deepinfra_model_from_label() -> None:
     assert (
-        normalize_deepinfra_model(
-            "openai/whisper-large-v3-turbo - Whisper Large V3 Turbo（推荐）"
-        )
+        normalize_deepinfra_model("openai/whisper-large-v3-turbo - Whisper Large V3 Turbo（推荐）")
         == "openai/whisper-large-v3-turbo"
     )
 
@@ -91,6 +89,89 @@ def test_submit_audio_adds_language_lock_prompt(monkeypatch) -> None:
     assert captured["data"]["language"] == "en"
     assert "English only" in captured["data"]["prompt"]
     assert "Do not translate" in captured["data"]["prompt"]
+
+
+def test_submit_audio_requests_word_timestamps_when_enabled(monkeypatch) -> None:
+    captured = {}
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict:
+            return {"text": "Hello"}
+
+    def fake_post(url, headers, data, files, timeout):
+        captured["data"] = data
+        return DummyResponse()
+
+    monkeypatch.setattr("videocaptioner.core.asr.deepinfra_asr.requests.post", fake_post)
+
+    asr = DeepInfraASR(
+        audio_input=b"\x00",
+        api_key="test-key",
+        language="en",
+        need_word_time_stamp=True,
+    )
+    asr._submit_audio()
+
+    assert captured["data"]["timestamp_granularities"] == "word"
+
+
+def test_make_segments_uses_word_timestamps_when_requested() -> None:
+    asr = DeepInfraASR(
+        audio_input=b"\x00",
+        use_cache=False,
+        language="en",
+        need_word_time_stamp=True,
+    )
+
+    segments = asr._make_segments(
+        {
+            "segments": [{"start": 0.0, "end": 1.0, "text": "Hello world"}],
+            "words": [
+                {"word": "Hello", "start": 0.12, "end": 0.45},
+                {"word": "world", "start": 0.52, "end": 0.95},
+            ],
+        }
+    )
+
+    assert [segment.text for segment in segments] == ["Hello", "world"]
+    assert segments[0].start_time == 120
+    assert segments[0].end_time == 450
+    assert segments[1].start_time == 520
+    assert segments[1].end_time == 950
+
+
+def test_make_segments_splits_readable_chunks_on_word_timestamp_boundaries() -> None:
+    asr = DeepInfraASR(audio_input=b"\x00", use_cache=False, language="en")
+    text = (
+        "Alpha beta gamma delta epsilon zeta eta theta iota kappa. "
+        "Lambda mu nu xi omicron pi rho sigma tau upsilon."
+    )
+    words = text.replace(".", "").split()
+
+    segments = asr._make_segments(
+        {
+            "segments": [
+                {
+                    "start": 0,
+                    "end": 20,
+                    "text": text,
+                    "words": [
+                        {"word": word, "start": index, "end": index + 0.75}
+                        for index, word in enumerate(words)
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert len(segments) == 2
+    assert segments[0].start_time == 0
+    assert segments[0].end_time == 9750
+    assert segments[1].start_time == 10000
+    assert segments[1].end_time == 19750
 
 
 def test_make_segments_removes_cjk_leakage_for_english() -> None:
