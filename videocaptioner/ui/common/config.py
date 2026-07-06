@@ -231,7 +231,7 @@ class Config(QConfig):
     # ------------------- Deepgram 配置 -------------------
     deepgram_api_key = ConfigItem("Deepgram", "ApiKey", "")
     deepgram_api_keys = ConfigItem("Deepgram", "ApiKeys", "[]")
-    deepgram_model = ConfigItem("Deepgram", "Model", "nova-2")
+    deepgram_model = ConfigItem("Deepgram", "Model", "nova-3-general")
     deepgram_punctuate = ConfigItem("Deepgram", "Punctuate", True, BoolValidator())
     deepgram_smart_format = ConfigItem("Deepgram", "SmartFormat", True, BoolValidator())
     deepgram_diarize = ConfigItem("Deepgram", "Diarize", False, BoolValidator())

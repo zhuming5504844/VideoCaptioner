@@ -14,11 +14,12 @@ from .base import BaseASR
 logger = setup_logger("deepgram_asr")
 
 DEEPGRAM_BASE_URL = "https://api.deepgram.com"
-DEEPGRAM_DEFAULT_MODEL = "nova-2"
+DEEPGRAM_DEFAULT_MODEL = "nova-3-general"
 
 DEEPGRAM_MODELS = {
-    "nova-2": "Nova-2 (通用，推荐)",
-    "nova-3": "Nova-3 (最新，增强)",
+    "nova-3-general": "Nova-3 General (最新，推荐)",
+    "nova-3": "Nova-3 (最新，兼容旧配置)",
+    "nova-2": "Nova-2 (通用)",
     "base-general": "Base (基础)",
     "whisper": "Whisper (OpenAI)",
 }
@@ -36,12 +37,13 @@ def normalize_deepgram_model(model: str | None) -> str:
 
     return value
 
-# Languages that rely on Nova-2's built-in 30+ language support
-# Passed as BCP-47 tags in the language query param.
-# Deepgram supports auto-detection when language is omitted.
+# Languages supported by Deepgram language detection / transcription.
+# Passed as BCP-47 tags in the language query param.  Keep these values aligned
+# with Deepgram's API rather than Whisper-specific aliases (for example use
+# ``zh`` instead of ``zh-CN``).
 DEEPGRAM_LANGUAGE_MAP: dict[str, str] = {
     "en": "en",
-    "zh": "zh-CN",
+    "zh": "zh",
     "ja": "ja",
     "ko": "ko",
     "es": "es",
@@ -58,6 +60,23 @@ DEEPGRAM_LANGUAGE_MAP: dict[str, str] = {
     "tl": "tl",
     "hi": "hi",
     "ar": "ar",
+    "bg": "bg",
+    "ca": "ca",
+    "cs": "cs",
+    "da": "da",
+    "el": "el",
+    "et": "et",
+    "fi": "fi",
+    "hu": "hu",
+    "lt": "lt",
+    "lv": "lv",
+    "no": "no",
+    "pl": "pl",
+    "ro": "ro",
+    "sk": "sk",
+    "sv": "sv",
+    "tr": "tr",
+    "uk": "uk",
 }
 
 
@@ -128,14 +147,21 @@ class DeepgramASR(BaseASR):
         url = f"{DEEPGRAM_BASE_URL}/v1/listen"
 
         # Build query parameters
+        request_model = self.model
         params: dict[str, str] = {
-            "model": self.model,
+            "model": request_model,
             "punctuate": "true" if self.punctuate else "false",
             "smart_format": "true" if self.smart_format else "false",
         }
         if self.language:
             bcp47 = DEEPGRAM_LANGUAGE_MAP.get(self.language, self.language)
             params["language"] = bcp47
+        else:
+            # Omitting the language parameter alone lets Deepgram use its default
+            # language.  Explicit language auto-detection requires this flag.
+            if request_model == "nova-3":
+                params["model"] = "nova-3-general"
+            params["detect_language"] = "true"
         if self.need_word_time_stamp:
             params["diarize"] = "true" if self.diarize else "false"
             params["paragraphs"] = "true" if self.paragraphs else "false"
