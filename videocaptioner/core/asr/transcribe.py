@@ -193,7 +193,7 @@ def _create_deepgram_asr(audio_path: str, config: TranscribeConfig) -> ChunkedAS
         "use_cache": True,
         "need_word_time_stamp": config.need_word_time_stamp,
         "api_key": config.deepgram_api_key or "",
-        "model": config.deepgram_model or "nova-2",
+        "model": config.deepgram_model or "nova-3-general",
         "language": config.transcribe_language,
         "punctuate": config.deepgram_punctuate,
         "smart_format": config.deepgram_smart_format,

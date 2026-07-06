@@ -71,7 +71,7 @@ DEFAULTS: Dict[str, Any] = {
     },
     "deepgram": {
         "api_key": "",
-        "model": "nova-2",
+        "model": "nova-3-general",
     },
     "whisper_api": {
         "api_key": "",

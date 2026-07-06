@@ -399,7 +399,7 @@ def _build_doctor_config() -> dict:
         },
         "deepgram": {
             "api_key": str(cfg.deepgram_api_key.value or "").strip(),
-            "model": str(cfg.deepgram_model.value or "nova-2").strip(),
+            "model": str(cfg.deepgram_model.value or "nova-3-general").strip(),
         },
         "transcribe": {
             "asr": asr_name,

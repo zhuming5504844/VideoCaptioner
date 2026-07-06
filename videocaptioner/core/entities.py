@@ -598,7 +598,7 @@ class TranscribeConfig:
     fun_asr_model: Optional[str] = None
     # Deepgram 配置
     deepgram_api_key: Optional[str] = None
-    deepgram_model: str = "nova-2"
+    deepgram_model: str = "nova-3-general"
     deepgram_punctuate: bool = True
     deepgram_smart_format: bool = True
     deepgram_diarize: bool = False
